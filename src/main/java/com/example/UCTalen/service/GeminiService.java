@@ -22,9 +22,9 @@ public class GeminiService {
         
         CRITICAL: You must return the output strictly as a raw JSON object, without any markdown formatting, wrappers, or ```json blocks. The JSON must exactly match this structure:
         {
-          "standard": "A professional, polite, and well-structured response.",
+          "professional": "A professional, polite, and well-structured response.",
           "friendly": "A warm, enthusiastic, and friendly response using empathetic language.",
-          "escalation": "An appropriate response focused on apology, conflict resolution, or compensation if the review is negative (1-3 stars), or an extra appreciative closing if positive."
+          "crisis": "An appropriate response focused on apology, conflict resolution, or compensation if the review is negative (1-3 stars), or an extra appreciative closing if positive."
         }
         
         Guidelines for replies:
@@ -61,7 +61,7 @@ public class GeminiService {
 
             db.collection("reviews").document(reviewId)
                     .update(
-                            "replyContent", selectedReply,
+                            "selectedResponse", selectedReply, // 🔑 Đã đồng bộ tên trường với file Review.java
                             "status", "Resolved"
                     ).get();
 
@@ -71,6 +71,8 @@ public class GeminiService {
             return false;
         }
     }
+
+
 
     public boolean fetchAndSaveMockReviews(String placeId) {
         try {
