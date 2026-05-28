@@ -1,8 +1,8 @@
 package com.example.UCTalen.controller;
 
-import UCTalent.UCOrm.model.Review;
-import UCTalent.UCOrm.service.GeminiService;
-import UCTalent.UCOrm.service.ReviewService;
+import com.example.UCTalen.model.Review;
+import com.example.UCTalen.service.GeminiService;
+import com.example.UCTalen.service.ReviewService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

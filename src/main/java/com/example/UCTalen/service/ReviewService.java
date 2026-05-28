@@ -1,6 +1,7 @@
 package com.example.UCTalen.service;
 
-import UCTalent.UCOrm.model.Review;
+
+import com.example.UCTalen.model.Review;
 import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.CollectionReference;
 import com.google.cloud.firestore.Firestore;
