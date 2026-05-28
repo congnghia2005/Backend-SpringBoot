@@ -1,44 +1,41 @@
 package com.example.UCTalen.service;
 
+
+import org.springframework.ai.google.genai.GoogleGenAiChatModel;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import com.google.cloud.firestore.Firestore;
 import com.google.firebase.cloud.FirestoreClient;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.stereotype.Service;
 
 import java.util.*;
 
 @Service
 public class GeminiService {
 
-    // 🔑 ĐÃ SỬA: Chuyển đổi sang ChatModel chuẩn của spring-ai-starter-model-google-genai
-    private final ChatModel chatModel;
-
-    public GeminiService(ChatModel chatModel) {
-        this.chatModel = chatModel;
-    }
+    @Autowired
+    private GoogleGenAiChatModel chatModel;
 
     private static final String SYSTEM_PROMPT = """
-    You are an expert Customer Relations Manager for an e-commerce platform.
-    Your task is to analyze the customer's review and generate exactly 3 types of replies in Vietnamese.
-
-    CRITICAL: You must return the output strictly as a raw JSON object, without any markdown formatting.
-
-    {
-      "professional": "Câu trả lời trang trọng, lịch sự",
-      "friendly": "Câu trả lời thân thiện, gần gũi",
-      "crisis": "Câu trả lời xử lý khủng hoảng, xoa dịu khách hàng"
-    }
-
-    Always answer in Vietnamese.
-    """;
+        You are an expert Customer Relations Manager for an e-commerce platform.
+        Your task is to analyze the customer's review and generate exactly 3 types of replies in Vietnamese.
+        
+        CRITICAL: You must return the output strictly as a raw JSON object, without any markdown formatting, wrappers, or ```json blocks. The JSON must exactly match this structure:
+        {
+          "standard": "A professional, polite, and well-structured response.",
+          "friendly": "A warm, enthusiastic, and friendly response using empathetic language.",
+          "escalation": "An appropriate response focused on apology, conflict resolution, or compensation if the review is negative (1-3 stars), or an extra appreciative closing if positive."
+        }
+        
+        Guidelines for replies:
+        - Always use polite and natural Vietnamese ("Cảm ơn quý khách", "Dạ", "Rất tiếc về trải nghiệm này").
+        - Keep responses concise, targeted, and appropriate to the review sentiment.
+        - Do not invent external details not implied in the review.
+        """;
 
     public String generateReply(String reviewContent) {
         try {
-            String finalPrompt = SYSTEM_PROMPT
-                    + "\nNội dung review của khách hàng: "
-                    + reviewContent;
-
-            // 🔑 ĐÃ SỬA: Thay thế cú pháp .prompt().user() bằng lệnh gọi call() truyền thống tương thích cao
+            String finalPrompt = SYSTEM_PROMPT + "\nNội dung review của khách hàng: " + reviewContent;
             String response = chatModel.call(finalPrompt);
 
             if (response == null) {
@@ -46,32 +43,28 @@ public class GeminiService {
             }
 
             response = response.trim();
-
             if (response.startsWith("```")) {
-                response = response
-                        .replaceAll("(?i)^```json", "")
-                        .replaceAll("(?i)^```", "")
-                        .replaceAll("```$", "")
-                        .trim();
+                response = response.replaceAll("(?i)^```json", "").replaceAll("(?i)^```", "").replaceAll("```$", "").trim();
             }
 
             return response;
 
         } catch (Exception e) {
             e.printStackTrace();
-            return "{\"error\":\"Lỗi khi gọi Gemini AI: " + e.getMessage() + "\"}";
+            return "{\"error\": \"Lỗi khi gọi Gemini AI: " + e.getMessage() + "\"}";
         }
     }
 
     public boolean saveReplyToFirebase(String reviewId, String selectedReply) {
         try {
             Firestore db = FirestoreClient.getFirestore();
-            db.collection("reviews")
-                    .document(reviewId)
+
+            db.collection("reviews").document(reviewId)
                     .update(
                             "replyContent", selectedReply,
                             "status", "Resolved"
                     ).get();
+
             return true;
         } catch (Exception e) {
             e.printStackTrace();
@@ -82,8 +75,10 @@ public class GeminiService {
     public boolean fetchAndSaveMockReviews(String placeId) {
         try {
             Firestore db = FirestoreClient.getFirestore();
+
             List<Map<String, Object>> mockPool = new ArrayList<>();
 
+            // === 3 MẪU CŨ CỦA BẠN ===
             mockPool.add(Map.of(
                     "authorName", "Lê Minh Hoàng", "rating", 5,
                     "text", "Dịch vụ ở đây rất tốt, nhân viên thân thiện và hỗ trợ nhiệt tình. Sẽ quay lại lần sau!",
@@ -99,6 +94,8 @@ public class GeminiService {
                     "text", "Đồ ăn sáng tạm ổn nhưng thực đơn chưa đa dạng lắm. Không gian quán rộng rãi sạch sẽ.",
                     "status", "pending"
             ));
+
+            // === THÊM 10 MẪU ĐA DẠNG NGỮ CẢNH (KHEN / CHÊ / TRUNG LẬP) ===
             mockPool.add(Map.of(
                     "authorName", "Trần Thu Hà", "rating", 5,
                     "text", "Giao diện trải nghiệm rất tuyệt vời! Vị trí đắc địa ngay trung tâm Đà Nẵng, phòng view sông Hàn ngắm pháo hoa siêu đỉnh.",
@@ -150,11 +147,14 @@ public class GeminiService {
                     "status", "pending"
             ));
 
+            // Xáo trộn ngẫu nhiên kho dữ liệu
             Collections.shuffle(mockPool);
-            int reviewsToFetch = Math.min(5, mockPool.size());
 
+            // Mỗi lần bấm Fetch sẽ bốc ra 3 review ngẫu nhiên (bạn có thể đổi thành 2, 3 hoặc 5 tùy ý)
+            int reviewsToFetch = 5;
             for (int i = 0; i < reviewsToFetch; i++) {
                 Map<String, Object> sample = mockPool.get(i);
+                // Sử dụng nanoTime kết hợp vòng lặp để sinh ID duy nhất tuyệt đối, tránh trùng khóa DB
                 String reviewId = "rev_" + System.nanoTime() + "_" + i;
 
                 Map<String, Object> docData = new HashMap<>();
@@ -165,11 +165,9 @@ public class GeminiService {
                 docData.put("text", sample.get("text"));
                 docData.put("status", sample.get("status"));
 
-                db.collection("reviews")
-                        .document(reviewId)
-                        .set(docData)
-                        .get();
+                db.collection("reviews").document(reviewId).set(docData).get();
             }
+
             return true;
         } catch (Exception e) {
             e.printStackTrace();
